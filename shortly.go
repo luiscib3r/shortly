@@ -2,7 +2,9 @@ package main
 
 import (
 	"github.com/aws/aws-cdk-go/awscdk/v2"
-	// "github.com/aws/aws-cdk-go/awscdk/v2/awssqs"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsapprunner"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsecrassets"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
 )
@@ -19,11 +21,69 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 	stack := awscdk.NewStack(scope, &id, &sprops)
 
 	// The code that defines your stack goes here
+	const project = "shortly"
 
-	// example resource
-	// queue := awssqs.NewQueue(stack, jsii.String("ShortlyQueue"), &awssqs.QueueProps{
-	// 	VisibilityTimeout: awscdk.Duration_Seconds(jsii.Number(300)),
-	// })
+	resourceName := func(resourceType string) string {
+		return project + "-" + resourceType
+	}
+
+	// ECR
+	imageName := resourceName("image")
+	image := awsecrassets.NewDockerImageAsset(
+		stack, jsii.String(imageName),
+		&awsecrassets.DockerImageAssetProps{
+			AssetName: jsii.String(imageName),
+			Directory: jsii.String("app"),
+			Platform:  awsecrassets.Platform_LINUX_AMD64(),
+		},
+	)
+
+	// IAM Role to access ECR
+	roleName := resourceName("ecr-access-role")
+	role := awsiam.NewRole(stack, jsii.String(roleName), &awsiam.RoleProps{
+		RoleName: jsii.String(roleName),
+		AssumedBy: awsiam.NewServicePrincipal(
+			jsii.String("build.apprunner.amazonaws.com"), nil,
+		),
+	})
+	image.Repository().GrantRead(role)
+	image.Repository().GrantPull(role)
+
+	// Instance role
+	instanceRoleName := resourceName("instance-role")
+	instanceRole := awsiam.NewRole(stack, jsii.String(instanceRoleName), &awsiam.RoleProps{
+		RoleName: jsii.String(instanceRoleName),
+		AssumedBy: awsiam.NewServicePrincipal(
+			jsii.String("tasks.apprunner.amazonaws.com"), nil,
+		),
+	})
+
+	// Service
+	serviceName := resourceName("service")
+	service := awsapprunner.NewCfnService(stack, jsii.String(serviceName), &awsapprunner.CfnServiceProps{
+		ServiceName: jsii.String(serviceName),
+		InstanceConfiguration: &awsapprunner.CfnService_InstanceConfigurationProperty{
+			InstanceRoleArn: instanceRole.RoleArn(),
+		},
+		SourceConfiguration: &awsapprunner.CfnService_SourceConfigurationProperty{
+			AuthenticationConfiguration: &awsapprunner.CfnService_AuthenticationConfigurationProperty{
+				AccessRoleArn: role.RoleArn(),
+			},
+			ImageRepository: &awsapprunner.CfnService_ImageRepositoryProperty{
+				ImageIdentifier:     image.ImageUri(),
+				ImageRepositoryType: jsii.String("ECR"),
+				ImageConfiguration: &awsapprunner.CfnService_ImageConfigurationProperty{
+					Port: jsii.String("8080"),
+				},
+			},
+		},
+	})
+
+	// Output
+	awscdk.NewCfnOutput(stack, jsii.String("ServiceURL"), &awscdk.CfnOutputProps{
+		ExportName: jsii.String("ServiceURL"),
+		Value:      service.AttrServiceUrl(),
+	})
 
 	return stack
 }
