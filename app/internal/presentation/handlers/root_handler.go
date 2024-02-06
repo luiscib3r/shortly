@@ -2,8 +2,6 @@ package handlers
 
 import "net/http"
 
-const RootPath = "/"
-
 type RootHandler struct{}
 
 func (h *RootHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

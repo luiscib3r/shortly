@@ -2,25 +2,75 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
-	"os"
 
-	"github.com/luiscib3r/shortly/app/handlers"
+	"github.com/gorilla/mux"
+	"github.com/luiscib3r/shortly/app/internal/data/datasources"
+	"github.com/luiscib3r/shortly/app/internal/data/repositories"
+	"github.com/luiscib3r/shortly/app/internal/domain/entities"
+	"github.com/luiscib3r/shortly/app/internal/presentation/handlers"
 )
 
 func main() {
-	mux := http.ServeMux{}
+	//----------------------------------------
+	// Datasources
+	//----------------------------------------
+	shortcutMemDB := datasources.NewMemDB[entities.Shortcut]()
+	environment := datasources.NewEnvironmentDataSource()
 
-	mux.Handle(handlers.RootPath, &handlers.RootHandler{})
+	//----------------------------------------
+	// Repositories
+	//----------------------------------------
+	shortcutRepository := repositories.NewShortcutRepositoryData(shortcutMemDB)
+	environmentRepository := repositories.NewEnvironmentRepositoryData(environment)
+	print(environmentRepository.GetBaseUrl())
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	//----------------------------------------
+	// Router
+	//----------------------------------------
+	router := mux.NewRouter()
+
+	//----------------------------------------
+	// Routes
+	//----------------------------------------
+	// GET /
+	rootHandler := &handlers.RootHandler{}
+	router.Methods("GET").Path("/").Handler(rootHandler)
+	//----------------------------------------
+	// Shortcut API
+	//----------------------------------------
+	shortcutHandler := handlers.NewShortcutHandler(
+		shortcutRepository,
+		environmentRepository,
+	)
+	//----------------------------------------
+	// GET /api/shortcuts
+	//----------------------------------------
+	router.Methods("GET").Path("/api/shortcut").HandlerFunc(shortcutHandler.FindAll)
+	//----------------------------------------
+	// POST /api/shortcuts
+	//----------------------------------------
+	router.Methods("POST").Path("/api/shortcut").HandlerFunc(shortcutHandler.Save)
+	//----------------------------------------
+	// GET /api/shortcut/{id}
+	//----------------------------------------
+	router.Methods("GET").Path("/api/shortcut/{id}").HandlerFunc(shortcutHandler.FindById)
+	//----------------------------------------
+	// DELETE /api/shortcut/{id}
+	//----------------------------------------
+	router.Methods("DELETE").Path("/api/shortcut/{id}").HandlerFunc(shortcutHandler.Delete)
+
+	//----------------------------------------
+	// Server
+	//----------------------------------------
+	port := environment.GetEnvironment().PORT
+	addr := fmt.Sprintf(":%d", port)
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: router,
 	}
 
-	fmt.Println("Server running on port " + port)
-	if err := http.ListenAndServe(":"+port, &mux); err != nil {
-		panic(err)
-	}
-
+	log.Println("Server running on ", addr)
+	log.Fatal(srv.ListenAndServe())
 }
