@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/url"
 
 	"github.com/gorilla/mux"
 	"github.com/luiscib3r/shortly/app/internal/domain/repositories"
+	"github.com/luiscib3r/shortly/app/internal/presentation/dtos"
 )
 
 type RedirectHandler struct {
@@ -28,11 +31,28 @@ func (h *RedirectHandler) Redirect(
 	query := r.URL.Query().Encode()
 
 	if shortcut, ok := h.repository.FindById(id); ok {
+		original, err := url.ParseRequestURI(shortcut.Url())
+
+		if err != nil {
+			response := dtos.ErrorDto{
+				Message: "Failed to parse original URL in shortcut",
+				Error:   err.Error(),
+			}
+
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		}
+
 		var redirectTo string
 		if query == "" {
-			redirectTo = shortcut.Url()
+			redirectTo = original.String()
+		} else if original.RawQuery == "" {
+			redirectTo = original.String() + "?" + query
 		} else {
-			redirectTo = shortcut.Url() + "?" + query
+			redirectTo = original.String() + "&" + query
 		}
 		w.Header().Set("Location", redirectTo)
 		w.WriteHeader(http.StatusTemporaryRedirect)

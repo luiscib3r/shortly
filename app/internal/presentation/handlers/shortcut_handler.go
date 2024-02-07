@@ -99,7 +99,16 @@ func (h *ShortcutHandler) Save(
 	shortcut, saveError := h.repository.SaveUrl(payload.Url)
 
 	if saveError != nil {
-		http.Error(w, saveError.Error(), http.StatusInternalServerError)
+		response := dtos.ErrorDto{
+			Message: "Failed to save shortcut",
+			Error:   saveError.Error(),
+		}
+
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
 		return
 	}
 

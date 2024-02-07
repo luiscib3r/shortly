@@ -1,7 +1,9 @@
 package repositories
 
 import (
+	"errors"
 	"math/rand"
+	"net/url"
 	"time"
 
 	"github.com/luiscib3r/shortly/app/internal/data/datasources"
@@ -25,15 +27,38 @@ func NewShortcutRepositoryData(
 }
 
 func (r ShortcutRepositoryData) SaveUrl(url string) (entities.Shortcut, error) {
+	urlParsed, err := validateURL(url)
+
+	if err != nil {
+		return entities.Shortcut{}, err
+	}
+
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 	id := base62.Encode(random.Int31())
 
 	shortcut := *entities.NewShortcut(
 		id,
-		url,
+		urlParsed,
 	)
 
 	return r.Save(shortcut)
+}
+
+func validateURL(urlString string) (string, error) {
+	parsedUri, err := url.ParseRequestURI(urlString)
+	if err != nil {
+		return "", err
+	}
+
+	if parsedUri.Host == "" {
+		return "", errors.New("invalid URL. You must provide a valid URL with a host")
+	}
+
+	if parsedUri.Scheme != "https" && parsedUri.Scheme != "http" {
+		return "", errors.New("invalid URL. You must provide a valid URL with a valid http or https scheme")
+	}
+
+	return urlString, nil
 }
 
 func (r ShortcutRepositoryData) FindAll() ([]entities.Shortcut, error) {
