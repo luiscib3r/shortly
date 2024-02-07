@@ -66,11 +66,11 @@ func main() {
 		environmentRepository,
 	)
 	//----------------------------------------
-	// GET /api/shortcuts
+	// GET /api/shortcut
 	//----------------------------------------
 	router.Methods("GET").Path("/api/shortcut").HandlerFunc(shortcutHandler.FindAll)
 	//----------------------------------------
-	// POST /api/shortcuts
+	// POST /api/shortcut
 	//----------------------------------------
 	router.Methods("POST").Path("/api/shortcut").HandlerFunc(shortcutHandler.Save)
 	//----------------------------------------

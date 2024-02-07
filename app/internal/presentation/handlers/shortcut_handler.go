@@ -28,12 +28,28 @@ func NewShortcutHandler(
 // @Tags Shortcut
 // @Produce json
 // @Success 200 {array} dtos.ShortcutDto
+// @Failure 500 {object} dtos.ErrorDto
 // @Router /api/shortcut [get]
 func (h *ShortcutHandler) FindAll(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	shortcuts := h.repository.FindAll()
+	w.Header().Set("Content-Type", "application/json")
+	shortcuts, err := h.repository.FindAll()
+
+	if err != nil {
+		response := dtos.ErrorDto{
+			Message: "Failed to get shortcuts",
+			Error:   err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		return
+	}
 
 	response := make([]dtos.ShortcutDto, len(shortcuts))
 
@@ -45,7 +61,6 @@ func (h *ShortcutHandler) FindAll(
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -57,15 +72,27 @@ func (h *ShortcutHandler) FindAll(
 // @Produce json
 // @Param payload body dtos.CreateShortcutDto true "Create Shortcut"
 // @Success 200 {object} dtos.ShortcutDto
+// @Failure 400 {object} dtos.ErrorDto
+// @Failure 500 {object} dtos.ErrorDto
 // @Router /api/shortcut [post]
 func (h *ShortcutHandler) Save(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	w.Header().Set("Content-Type", "application/json")
 	var payload dtos.CreateShortcutDto
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		response := dtos.ErrorDto{
+			Message: "Invalid request payload",
+			Error:   err.Error(),
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
 		return
 	}
 
@@ -76,7 +103,6 @@ func (h *ShortcutHandler) Save(
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(dtos.ShortcutDto{
 		Id:    shortcut.Id(),
 		Url:   shortcut.Url(),
@@ -91,24 +117,41 @@ func (h *ShortcutHandler) Save(
 // @Produce json
 // @Param id path string true "Shortcut ID"
 // @Success 200 {object} dtos.ShortcutDto
+// @Failure 404 {object} dtos.ErrorDto
+// @Failure 500 {object} dtos.ErrorDto
 // @Router /api/shortcut/{id} [get]
 func (h *ShortcutHandler) FindById(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
 
 	if shortcut, ok := h.repository.FindById(id); ok {
-		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(dtos.ShortcutDto{
 			Id:    shortcut.Id(),
 			Url:   shortcut.Url(),
 			Short: h.getShortUrl(shortcut.Id()),
 		}); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			response := dtos.ErrorDto{
+				Message: "Failed to get shortcut",
+				Error:   err.Error(),
+			}
+
+			w.WriteHeader(http.StatusInternalServerError)
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		}
 	} else {
-		http.Error(w, "Not Found", http.StatusNotFound)
+		response := dtos.ErrorDto{
+			Message: "Shortcut not found",
+			Error:   "Not Found",
+		}
+		w.WriteHeader(http.StatusNotFound)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -116,6 +159,8 @@ func (h *ShortcutHandler) FindById(
 // @Tags Shortcut
 // @Param id path string true "Shortcut ID"
 // @Success 204
+// @Failure 404 {object} dtos.ErrorDto
+// @Failure 500 {object} dtos.ErrorDto
 // @Router /api/shortcut/{id} [delete]
 func (h *ShortcutHandler) Delete(
 	w http.ResponseWriter,
@@ -126,7 +171,14 @@ func (h *ShortcutHandler) Delete(
 	if ok := h.repository.Delete(id); ok {
 		w.WriteHeader(http.StatusNoContent)
 	} else {
-		http.Error(w, "Not Found", http.StatusNotFound)
+		response := dtos.ErrorDto{
+			Message: "Shortcut not found",
+			Error:   "Not Found",
+		}
+		w.WriteHeader(http.StatusNotFound)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 

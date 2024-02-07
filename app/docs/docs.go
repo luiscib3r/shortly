@@ -41,6 +41,12 @@ const docTemplate = `{
                                 "$ref": "#/definitions/dtos.ShortcutDto"
                             }
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorDto"
+                        }
                     }
                 }
             },
@@ -72,6 +78,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dtos.ShortcutDto"
                         }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorDto"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorDto"
+                        }
                     }
                 }
             }
@@ -100,6 +118,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/dtos.ShortcutDto"
                         }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorDto"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorDto"
+                        }
                     }
                 }
             },
@@ -120,6 +150,18 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorDto"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dtos.ErrorDto"
+                        }
                     }
                 }
             }
@@ -130,6 +172,17 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "dtos.ErrorDto": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
                     "type": "string"
                 }
             }

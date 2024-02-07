@@ -5,6 +5,13 @@ definitions:
       url:
         type: string
     type: object
+  dtos.ErrorDto:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
   dtos.ShortcutDto:
     properties:
       id:
@@ -37,6 +44,10 @@ paths:
             items:
               $ref: '#/definitions/dtos.ShortcutDto'
             type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dtos.ErrorDto'
       summary: Get Shortcuts
       tags:
       - Shortcut
@@ -57,6 +68,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dtos.ShortcutDto'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dtos.ErrorDto'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dtos.ErrorDto'
       summary: Create Shortcut
       tags:
       - Shortcut
@@ -71,6 +90,14 @@ paths:
       responses:
         "204":
           description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dtos.ErrorDto'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dtos.ErrorDto'
       summary: Delete Shortcut by ID
       tags:
       - Shortcut
@@ -88,6 +115,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dtos.ShortcutDto'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dtos.ErrorDto'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dtos.ErrorDto'
       summary: Get Shortcut by ID
       tags:
       - Shortcut

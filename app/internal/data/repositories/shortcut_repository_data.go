@@ -36,14 +36,14 @@ func (r ShortcutRepositoryData) SaveUrl(url string) (entities.Shortcut, error) {
 	return r.Save(shortcut)
 }
 
-func (r ShortcutRepositoryData) FindAll() []entities.Shortcut {
+func (r ShortcutRepositoryData) FindAll() ([]entities.Shortcut, error) {
 	result, err := r.dynamodb.Find(25)
 
 	if err != nil {
-		return make([]entities.Shortcut, 0)
+		return make([]entities.Shortcut, 0), err
 	}
 
-	return result
+	return result, nil
 }
 
 func (r ShortcutRepositoryData) FindById(id string) (entities.Shortcut, bool) {
