@@ -18,11 +18,16 @@ func main() {
 	//----------------------------------------
 	shortcutMemDB := datasources.NewMemDB[entities.Shortcut]()
 	environment := datasources.NewEnvironmentDataSource()
+	shortcutDynamoDB, err := datasources.NewShortcutDynamoDB()
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//----------------------------------------
 	// Repositories
 	//----------------------------------------
-	shortcutRepository := repositories.NewShortcutRepositoryData(shortcutMemDB)
+	shortcutRepository := repositories.NewShortcutRepositoryData(shortcutDynamoDB, shortcutMemDB)
 	environmentRepository := repositories.NewEnvironmentRepositoryData(environment)
 
 	//----------------------------------------
@@ -54,11 +59,11 @@ func main() {
 	//----------------------------------------
 	// GET /api/shortcut/{id}
 	//----------------------------------------
-	router.Methods("GET").Path("/api/shortcut/{id}").HandlerFunc(shortcutHandler.FindById)
+	router.Methods("GET").Path("/api/shortcut/{id:[a-zA-Z0-9]{6}}").HandlerFunc(shortcutHandler.FindById)
 	//----------------------------------------
 	// DELETE /api/shortcut/{id}
 	//----------------------------------------
-	router.Methods("DELETE").Path("/api/shortcut/{id}").HandlerFunc(shortcutHandler.Delete)
+	router.Methods("DELETE").Path("/api/shortcut/{id:[a-zA-Z0-9]{6}}").HandlerFunc(shortcutHandler.Delete)
 
 	//----------------------------------------
 	// Redirect
@@ -68,7 +73,7 @@ func main() {
 	//----------------------------------------
 	// GET /{id}
 	//----------------------------------------
-	router.Methods("GET").Path("/{id}").HandlerFunc(redirectHandler.Redirect)
+	router.Methods("GET").Path("/{id:[a-zA-Z0-9]{6}}").HandlerFunc(redirectHandler.Redirect)
 
 	//----------------------------------------
 	// Server

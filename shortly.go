@@ -1,8 +1,11 @@
 package main
 
 import (
+	"os"
+
 	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsapprunner"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecrassets"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
 	"github.com/aws/constructs-go/constructs/v10"
@@ -26,6 +29,17 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 	resourceName := func(resourceType string) string {
 		return project + "-" + resourceType
 	}
+
+	// Database DynamoDB
+	// Shortcut table
+	shortcutTableName := resourceName("shortcut")
+	shortcutTable := awsdynamodb.NewTableV2(stack, jsii.String(shortcutTableName), &awsdynamodb.TablePropsV2{
+		TableName: jsii.String(shortcutTableName),
+		PartitionKey: &awsdynamodb.Attribute{
+			Name: jsii.String("id"),
+			Type: awsdynamodb.AttributeType_STRING,
+		},
+	})
 
 	// ECR
 	imageName := resourceName("image")
@@ -58,6 +72,9 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 		),
 	})
 
+	// Grant access to DynamoDB
+	shortcutTable.GrantReadWriteData(instanceRole)
+
 	// Service
 	serviceName := resourceName("service")
 	service := awsapprunner.NewCfnService(stack, jsii.String(serviceName), &awsapprunner.CfnServiceProps{
@@ -74,6 +91,16 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 				ImageRepositoryType: jsii.String("ECR"),
 				ImageConfiguration: &awsapprunner.CfnService_ImageConfigurationProperty{
 					Port: jsii.String("8080"),
+					RuntimeEnvironmentVariables: []interface{}{
+						&awsapprunner.CfnService_KeyValuePairProperty{
+							Name:  jsii.String("BaseURL"),
+							Value: jsii.String(os.Getenv("BaseURL")),
+						},
+						&awsapprunner.CfnService_KeyValuePairProperty{
+							Name:  jsii.String("ShortcutsTableName"),
+							Value: shortcutTable.TableName(),
+						},
+					},
 				},
 			},
 		},

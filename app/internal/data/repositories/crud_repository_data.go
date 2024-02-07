@@ -23,8 +23,8 @@ func (r CrudRepositoryData[T]) FindById(id string) (T, bool) {
 	return r.memdb.FindById(id)
 }
 
-func (r CrudRepositoryData[T]) Save(entity T) T {
-	return r.memdb.Save(entity)
+func (r CrudRepositoryData[T]) Save(entity T) (T, error) {
+	return r.memdb.Save(entity), nil
 }
 
 func (r CrudRepositoryData[T]) Delete(id string) bool {

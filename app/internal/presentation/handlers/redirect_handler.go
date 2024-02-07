@@ -25,10 +25,15 @@ func (h *RedirectHandler) Redirect(
 ) {
 	vars := mux.Vars(r)
 	id := vars["id"]
-	query := r.URL.Query()
+	query := r.URL.Query().Encode()
 
 	if shortcut, ok := h.repository.FindById(id); ok {
-		redirectTo := shortcut.Url() + "?" + query.Encode()
+		var redirectTo string
+		if query == "" {
+			redirectTo = shortcut.Url()
+		} else {
+			redirectTo = shortcut.Url() + "?" + query
+		}
 		w.Header().Set("Location", redirectTo)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	} else {

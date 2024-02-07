@@ -57,7 +57,12 @@ func (h *ShortcutHandler) Save(
 		return
 	}
 
-	shortcut := h.repository.SaveUrl(payload.Url)
+	shortcut, saveError := h.repository.SaveUrl(payload.Url)
+
+	if saveError != nil {
+		http.Error(w, saveError.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(dtos.ShortcutDto{
