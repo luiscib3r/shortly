@@ -24,7 +24,6 @@ func main() {
 	//----------------------------------------
 	shortcutRepository := repositories.NewShortcutRepositoryData(shortcutMemDB)
 	environmentRepository := repositories.NewEnvironmentRepositoryData(environment)
-	print(environmentRepository.GetBaseUrl())
 
 	//----------------------------------------
 	// Router
@@ -60,6 +59,16 @@ func main() {
 	// DELETE /api/shortcut/{id}
 	//----------------------------------------
 	router.Methods("DELETE").Path("/api/shortcut/{id}").HandlerFunc(shortcutHandler.Delete)
+
+	//----------------------------------------
+	// Redirect
+	redirectHandler := handlers.NewRedirectHandler(
+		shortcutRepository,
+	)
+	//----------------------------------------
+	// GET /{id}
+	//----------------------------------------
+	router.Methods("GET").Path("/{id}").HandlerFunc(redirectHandler.Redirect)
 
 	//----------------------------------------
 	// Server
