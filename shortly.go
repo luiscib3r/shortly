@@ -75,10 +75,23 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 	// Grant access to DynamoDB
 	shortcutTable.GrantReadWriteData(instanceRole)
 
+	// Auto scaling
+	autoscaleName := resourceName("autoscale")
+	autoscale := awsapprunner.NewCfnAutoScalingConfiguration(
+		stack, jsii.String(autoscaleName),
+		&awsapprunner.CfnAutoScalingConfigurationProps{
+			AutoScalingConfigurationName: jsii.String(autoscaleName),
+			MaxConcurrency:               jsii.Number(200),
+			MaxSize:                      jsii.Number(25),
+			MinSize:                      jsii.Number(1),
+		},
+	)
+
 	// Service
 	serviceName := resourceName("service")
 	service := awsapprunner.NewCfnService(stack, jsii.String(serviceName), &awsapprunner.CfnServiceProps{
-		ServiceName: jsii.String(serviceName),
+		ServiceName:                 jsii.String(serviceName),
+		AutoScalingConfigurationArn: autoscale.AttrAutoScalingConfigurationArn(),
 		InstanceConfiguration: &awsapprunner.CfnService_InstanceConfigurationProperty{
 			InstanceRoleArn: instanceRole.RoleArn(),
 		},
