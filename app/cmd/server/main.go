@@ -6,13 +6,30 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	_ "github.com/luiscib3r/shortly/app/docs"
 	"github.com/luiscib3r/shortly/app/internal/data/datasources"
 	"github.com/luiscib3r/shortly/app/internal/data/repositories"
 	"github.com/luiscib3r/shortly/app/internal/domain/entities"
 	"github.com/luiscib3r/shortly/app/internal/presentation/handlers"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// Swagger
+//	@title			Shortly Service
+//	@version		1.0
+//	@description	URL shortener service
+
+//	@contact.name	Luis Ciber
+//	@contact.url	https://www.luisciber.com/
+//	@contact.email	luisciber640@gmail.com
+
+//	@license.name	MIT
+//	@license.url	https://github.com/luicib3r/shortly
+
+// @host
+// @BasePath	/
 func main() {
+
 	//----------------------------------------
 	// Datasources
 	//----------------------------------------
@@ -74,6 +91,9 @@ func main() {
 	// GET /{id}
 	//----------------------------------------
 	router.Methods("GET").Path("/{id:[a-zA-Z0-9]{6}}").HandlerFunc(redirectHandler.Redirect)
+
+	// Swagger
+	router.Methods("GET").PathPrefix("/docs").Handler(httpSwagger.WrapHandler)
 
 	//----------------------------------------
 	// Server

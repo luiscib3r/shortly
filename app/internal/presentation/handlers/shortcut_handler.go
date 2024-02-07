@@ -24,6 +24,11 @@ func NewShortcutHandler(
 	}
 }
 
+// @Summary	Get Shortcuts
+// @Tags Shortcut
+// @Produce json
+// @Success 200 {array} dtos.ShortcutDto
+// @Router /api/shortcut [get]
 func (h *ShortcutHandler) FindAll(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -46,6 +51,13 @@ func (h *ShortcutHandler) FindAll(
 	}
 }
 
+// @Summary	Create Shortcut
+// @Tags Shortcut
+// @Accept json
+// @Produce json
+// @Param payload body dtos.CreateShortcutDto true "Create Shortcut"
+// @Success 200 {object} dtos.ShortcutDto
+// @Router /api/shortcut [post]
 func (h *ShortcutHandler) Save(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -74,6 +86,12 @@ func (h *ShortcutHandler) Save(
 	}
 }
 
+// @Summary	Get Shortcut by ID
+// @Tags Shortcut
+// @Produce json
+// @Param id path string true "Shortcut ID"
+// @Success 200 {object} dtos.ShortcutDto
+// @Router /api/shortcut/{id} [get]
 func (h *ShortcutHandler) FindById(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -94,6 +112,11 @@ func (h *ShortcutHandler) FindById(
 	}
 }
 
+// @Summary	Delete Shortcut by ID
+// @Tags Shortcut
+// @Param id path string true "Shortcut ID"
+// @Success 204
+// @Router /api/shortcut/{id} [delete]
 func (h *ShortcutHandler) Delete(
 	w http.ResponseWriter,
 	r *http.Request,

@@ -1,0 +1,94 @@
+basePath: /
+definitions:
+  dtos.CreateShortcutDto:
+    properties:
+      url:
+        type: string
+    type: object
+  dtos.ShortcutDto:
+    properties:
+      id:
+        type: string
+      short:
+        type: string
+      url:
+        type: string
+    type: object
+info:
+  contact:
+    email: luisciber640@gmail.com
+    name: Luis Ciber
+    url: https://www.luisciber.com/
+  description: URL shortener service
+  license:
+    name: MIT
+    url: https://github.com/luicib3r/shortly
+  title: Shortly Service
+  version: "1.0"
+paths:
+  /api/shortcut:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dtos.ShortcutDto'
+            type: array
+      summary: Get Shortcuts
+      tags:
+      - Shortcut
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Create Shortcut
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.CreateShortcutDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.ShortcutDto'
+      summary: Create Shortcut
+      tags:
+      - Shortcut
+  /api/shortcut/{id}:
+    delete:
+      parameters:
+      - description: Shortcut ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete Shortcut by ID
+      tags:
+      - Shortcut
+    get:
+      parameters:
+      - description: Shortcut ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.ShortcutDto'
+      summary: Get Shortcut by ID
+      tags:
+      - Shortcut
+swagger: "2.0"
