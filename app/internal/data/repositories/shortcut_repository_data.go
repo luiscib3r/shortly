@@ -13,7 +13,7 @@ import (
 
 type ShortcutRepositoryData struct {
 	dynamodb *datasources.ShortcutDynamoDB
-	redis *datasources.ShortcutRedis
+	redis    *datasources.ShortcutRedis
 }
 
 func NewShortcutRepositoryData(
@@ -21,8 +21,8 @@ func NewShortcutRepositoryData(
 	shortcutRedis *datasources.ShortcutRedis,
 ) *ShortcutRepositoryData {
 	return &ShortcutRepositoryData{
-		dynamodb:           shortcutDynamoDB,
-		redis:              shortcutRedis,
+		dynamodb: shortcutDynamoDB,
+		redis:    shortcutRedis,
 	}
 }
 
@@ -107,6 +107,9 @@ func (r ShortcutRepositoryData) Save(entity entities.Shortcut) (entities.Shortcu
 }
 
 func (r ShortcutRepositoryData) Delete(id string) bool {
-	r.dynamodb.Delete(id)
-	return true
+	// Delete from cache
+	r.redis.Delete(id)
+
+	// Delete from dynamodb
+	return r.dynamodb.Delete(id)
 }

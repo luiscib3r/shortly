@@ -53,3 +53,13 @@ func (s ShortcutRedis) FindById(id string) (string, error) {
 
 	return result, nil
 }
+
+func (s ShortcutRedis) Delete(id string) (bool, error) {
+	_, err := s.rdb.Del(context.Background(), id).Result()
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
