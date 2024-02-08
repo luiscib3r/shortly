@@ -39,6 +39,6 @@ cdk deploy
  * `cdk diff`        compare deployed stack with current state
  * `cdk synth`       emits the synthesized CloudFormation template
 
-## Infrastructure Architecture
+## Infrastructure Diagram
 
 ![Infrastructure Architecture](docs/images/infra.png)
