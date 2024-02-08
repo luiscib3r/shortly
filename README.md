@@ -38,3 +38,7 @@ cdk deploy
  * `cdk deploy`      deploy this stack to your default AWS account/region
  * `cdk diff`        compare deployed stack with current state
  * `cdk synth`       emits the synthesized CloudFormation template
+
+## Infrastructure Architecture
+
+![Infrastructure Architecture](docs/images/infra.png)
