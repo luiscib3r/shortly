@@ -2,12 +2,17 @@ package main
 
 import (
 	"os"
+	"reflect"
 
 	"github.com/aws/aws-cdk-go/awscdk/v2"
-	"github.com/aws/aws-cdk-go/awscdk/v2/awsapprunner"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsapplicationautoscaling"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecrassets"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsecs"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsecspatterns"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awselasticloadbalancingv2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsroute53"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
 )
@@ -22,6 +27,12 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 		sprops = props.StackProps
 	}
 	stack := awscdk.NewStack(scope, &id, &sprops)
+
+	domainNameVar := stack.Node().TryGetContext(jsii.String(id + ":domainName"))
+	hostedZoneNameVar := stack.Node().TryGetContext(jsii.String(id + ":hostedZoneName"))
+
+	domainName := reflect.ValueOf(domainNameVar).String()
+	hostedZoneName := reflect.ValueOf(hostedZoneNameVar).String()
 
 	// The code that defines your stack goes here
 	const project = "shortly"
@@ -41,6 +52,18 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 		},
 	})
 
+	// ECS Task Role
+	taskRoleName := resourceName("task-role")
+	taskRole := awsiam.NewRole(stack, jsii.String(taskRoleName), &awsiam.RoleProps{
+		RoleName: jsii.String(taskRoleName),
+		AssumedBy: awsiam.NewServicePrincipal(
+			jsii.String("ecs-tasks.amazonaws.com"), nil,
+		),
+	})
+
+	// Grant access to DynamoDB
+	shortcutTable.GrantReadWriteData(taskRole)
+
 	// ECR
 	imageName := resourceName("image")
 	image := awsecrassets.NewDockerImageAsset(
@@ -48,81 +71,110 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 		&awsecrassets.DockerImageAssetProps{
 			AssetName: jsii.String(imageName),
 			Directory: jsii.String("app"),
-			Platform:  awsecrassets.Platform_LINUX_AMD64(),
+			Platform:  awsecrassets.Platform_LINUX_ARM64(),
 		},
 	)
 
-	// IAM Role to access ECR
-	roleName := resourceName("ecr-access-role")
-	role := awsiam.NewRole(stack, jsii.String(roleName), &awsiam.RoleProps{
-		RoleName: jsii.String(roleName),
-		AssumedBy: awsiam.NewServicePrincipal(
-			jsii.String("build.apprunner.amazonaws.com"), nil,
-		),
-	})
-	image.Repository().GrantRead(role)
-	image.Repository().GrantPull(role)
-
-	// Instance role
-	instanceRoleName := resourceName("instance-role")
-	instanceRole := awsiam.NewRole(stack, jsii.String(instanceRoleName), &awsiam.RoleProps{
-		RoleName: jsii.String(instanceRoleName),
-		AssumedBy: awsiam.NewServicePrincipal(
-			jsii.String("tasks.apprunner.amazonaws.com"), nil,
-		),
+	// Fargate Task Definition
+	taskDefName := resourceName("task-def")
+	taskDef := awsecs.NewFargateTaskDefinition(stack, jsii.String(taskDefName), &awsecs.FargateTaskDefinitionProps{
+		TaskRole: taskRole,
+		RuntimePlatform: &awsecs.RuntimePlatform{
+			CpuArchitecture: awsecs.CpuArchitecture_ARM64(),
+		},
+		Cpu:            jsii.Number(512),
+		MemoryLimitMiB: jsii.Number(1024),
 	})
 
-	// Grant access to DynamoDB
-	shortcutTable.GrantReadWriteData(instanceRole)
+	// Logging
+	logging := awsecs.LogDrivers_AwsLogs(&awsecs.AwsLogDriverProps{
+		StreamPrefix: jsii.String("shortly"),
+	})
 
-	// Auto scaling
-	autoscaleName := resourceName("autoscale")
-	autoscale := awsapprunner.NewCfnAutoScalingConfiguration(
-		stack, jsii.String(autoscaleName),
-		&awsapprunner.CfnAutoScalingConfigurationProps{
-			AutoScalingConfigurationName: jsii.String(autoscaleName),
-			MaxConcurrency:               jsii.Number(200),
-			MaxSize:                      jsii.Number(25),
-			MinSize:                      jsii.Number(1),
-		},
-	)
+	// Task Container
+	containerName := resourceName("container")
 
-	// Service
-	serviceName := resourceName("service")
-	service := awsapprunner.NewCfnService(stack, jsii.String(serviceName), &awsapprunner.CfnServiceProps{
-		ServiceName:                 jsii.String(serviceName),
-		AutoScalingConfigurationArn: autoscale.AttrAutoScalingConfigurationArn(),
-		InstanceConfiguration: &awsapprunner.CfnService_InstanceConfigurationProperty{
-			InstanceRoleArn: instanceRole.RoleArn(),
-		},
-		SourceConfiguration: &awsapprunner.CfnService_SourceConfigurationProperty{
-			AuthenticationConfiguration: &awsapprunner.CfnService_AuthenticationConfigurationProperty{
-				AccessRoleArn: role.RoleArn(),
-			},
-			ImageRepository: &awsapprunner.CfnService_ImageRepositoryProperty{
-				ImageIdentifier:     image.ImageUri(),
-				ImageRepositoryType: jsii.String("ECR"),
-				ImageConfiguration: &awsapprunner.CfnService_ImageConfigurationProperty{
-					Port: jsii.String("8080"),
-					RuntimeEnvironmentVariables: []interface{}{
-						&awsapprunner.CfnService_KeyValuePairProperty{
-							Name:  jsii.String("BaseURL"),
-							Value: jsii.String(os.Getenv("BaseURL")),
-						},
-						&awsapprunner.CfnService_KeyValuePairProperty{
-							Name:  jsii.String("ShortcutsTableName"),
-							Value: shortcutTable.TableName(),
-						},
-					},
+	taskDef.AddContainer(
+		jsii.String(containerName),
+		&awsecs.ContainerDefinitionOptions{
+			Image:   awsecs.ContainerImage_FromDockerImageAsset(image),
+			Logging: logging,
+			PortMappings: &[]*awsecs.PortMapping{
+				{
+					ContainerPort: jsii.Number(8080),
 				},
 			},
+			Environment: &map[string]*string{
+				"BaseURL":            jsii.String(os.Getenv("BaseURL")),
+				"ShortcutsTableName": shortcutTable.TableName(),
+			},
+			HealthCheck: &awsecs.HealthCheck{
+				Command: jsii.Strings("CMD-SHELL", "curl -f http://localhost:8080/healthcheck || exit 1"),
+			},
 		},
+	)
+
+	// Hosted Zone
+	hostedZone := awsroute53.HostedZone_FromLookup(
+		stack, jsii.String(resourceName("hosted-zone")),
+		&awsroute53.HostedZoneProviderProps{
+			DomainName: jsii.String(hostedZoneName),
+		},
+	)
+
+	// Fargate Load Balanced Service
+	serviceName := resourceName("service")
+	service := awsecspatterns.NewApplicationLoadBalancedFargateService(stack,
+		jsii.String(serviceName),
+		&awsecspatterns.ApplicationLoadBalancedFargateServiceProps{
+			ServiceName:        jsii.String(serviceName),
+			LoadBalancerName:   jsii.String(resourceName("lb")),
+			TaskDefinition:     taskDef,
+			PublicLoadBalancer: jsii.Bool(true),
+			DesiredCount:       jsii.Number(1),
+			RedirectHTTP:       jsii.Bool(true),
+			Protocol:           awselasticloadbalancingv2.ApplicationProtocol_HTTPS,
+			TargetProtocol:     awselasticloadbalancingv2.ApplicationProtocol_HTTP,
+			DomainName:         jsii.String(domainName),
+			DomainZone:         hostedZone,
+		},
+	)
+
+	// Health Check
+	albHealthCheck := &awselasticloadbalancingv2.HealthCheck{
+		Path:     jsii.String("/healthcheck"),
+		Port:     jsii.String("8080"),
+		Protocol: awselasticloadbalancingv2.Protocol_HTTP,
+	}
+
+	service.TargetGroup().ConfigureHealthCheck(albHealthCheck)
+
+	// Auto scaling
+	scaling := service.Service().AutoScaleTaskCount(&awsapplicationautoscaling.EnableScalingProps{
+		MaxCapacity: jsii.Number(100),
 	})
+
+	scaling.ScaleOnCpuUtilization(
+		jsii.String(resourceName("cpu-scaling")),
+		&awsecs.CpuUtilizationScalingProps{
+			TargetUtilizationPercent: jsii.Number(90),
+			ScaleInCooldown:          awscdk.Duration_Seconds(jsii.Number(60)),
+			ScaleOutCooldown:         awscdk.Duration_Seconds(jsii.Number(60)),
+		},
+	)
+
+	scaling.ScaleOnMemoryUtilization(
+		jsii.String(resourceName("memory-scaling")),
+		&awsecs.MemoryUtilizationScalingProps{
+			TargetUtilizationPercent: jsii.Number(90),
+			ScaleInCooldown:          awscdk.Duration_Seconds(jsii.Number(60)),
+			ScaleOutCooldown:         awscdk.Duration_Seconds(jsii.Number(60)),
+		},
+	)
 
 	// Output
 	awscdk.NewCfnOutput(stack, jsii.String("ServiceURL"), &awscdk.CfnOutputProps{
-		ExportName: jsii.String("ServiceURL"),
-		Value:      service.AttrServiceUrl(),
+		Value: service.LoadBalancer().LoadBalancerDnsName(),
 	})
 
 	return stack
@@ -149,7 +201,7 @@ func env() *awscdk.Environment {
 	// Account/Region-dependent features and context lookups will not work, but a
 	// single synthesized template can be deployed anywhere.
 	//---------------------------------------------------------------------------
-	return nil
+	// return nil
 
 	// Uncomment if you know exactly what account and region you want to deploy
 	// the stack to. This is the recommendation for production stacks.
@@ -163,8 +215,8 @@ func env() *awscdk.Environment {
 	// implied by the current CLI configuration. This is recommended for dev
 	// stacks.
 	//---------------------------------------------------------------------------
-	// return &awscdk.Environment{
-	//  Account: jsii.String(os.Getenv("CDK_DEFAULT_ACCOUNT")),
-	//  Region:  jsii.String(os.Getenv("CDK_DEFAULT_REGION")),
-	// }
+	return &awscdk.Environment{
+		Account: jsii.String(os.Getenv("CDK_DEFAULT_ACCOUNT")),
+		Region:  jsii.String(os.Getenv("CDK_DEFAULT_REGION")),
+	}
 }
