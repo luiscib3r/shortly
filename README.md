@@ -1,10 +1,19 @@
 # Shortly
 
+## Local Docker Compose Deploy
+
+```bash
+git clone https://github.com/luiscib3r/shortly.git
+cd app
+docker compose up
+```
+
 ## AWS Deploy
 
 ## Set CDK context
 
 ```bash
+git clone https://github.com/luiscib3r/shortly.git
 cp cdk.context.example.json cdk.context.json
 ```
 
@@ -17,12 +26,6 @@ Example
   "ShortlyStack:hostedZoneName": "yourdomain.com",
   "ShortlyStack:domainName": "link.yourdomain.com"
 }
-```
-
-### Set BaseURL environment variable before deploy
-
-```bash
-export BaseURL="https://link.yourdomain.com"
 ```
 then
 

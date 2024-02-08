@@ -127,6 +127,7 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 		stack,
 		jsii.String(redisName),
 		&awselasticache.CfnCacheClusterProps{
+			ClusterName:          jsii.String(redisName),
 			Engine:               jsii.String("redis"),
 			CacheNodeType:        jsii.String("cache.t3.micro"),
 			NumCacheNodes:        jsii.Number(1),
@@ -134,6 +135,8 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 			VpcSecurityGroupIds:  &[]*string{redisSecurityGroup.SecurityGroupId()},
 		},
 	)
+
+	redisEndpoint := *redisCluster.AttrRedisEndpointAddress() + ":" + *redisCluster.AttrRedisEndpointPort()
 
 	// ECS Task Role
 	taskRoleName := resourceName("task-role")
@@ -188,9 +191,9 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 				},
 			},
 			Environment: &map[string]*string{
-				"BaseURL":            jsii.String(os.Getenv("BaseURL")),
+				"BaseURL":            jsii.String("https://" + domainName),
 				"ShortcutsTableName": shortcutTable.TableName(),
-				"RedisEndpoint":      redisCluster.AttrRedisEndpointAddress(),
+				"RedisEndpoint":      jsii.String(redisEndpoint),
 			},
 			HealthCheck: &awsecs.HealthCheck{
 				Command: jsii.Strings("CMD-SHELL", "curl -f http://localhost:8080/healthcheck || exit 1"),
