@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -29,7 +30,34 @@ func NewShortcutDynamoDB() (*ShortcutDynamoDB, error) {
 	}
 
 	// Load SDK config
-	if cfg, err := config.LoadDefaultConfig(context.TODO()); err == nil {
+	var cfg aws.Config
+	var err error
+
+	if dbEndpoint := os.Getenv("DynamoDBEndpoint"); dbEndpoint != "" {
+		// Use local DynamoDB
+		resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				URL: dbEndpoint,
+			}, nil
+		})
+
+		cfg, err = config.LoadDefaultConfig(context.TODO(),
+			config.WithRegion("us-east-1"),
+			config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
+				Value: aws.Credentials{
+					AccessKeyID:     "dummy",
+					SecretAccessKey: "dummy",
+					SessionToken:    "dummy",
+					Source:          "Hard-coded credentials; values are irrelevant for local DynamoDB",
+				},
+			}),
+			config.WithEndpointResolverWithOptions(resolver),
+		)
+	} else {
+		cfg, err = config.LoadDefaultConfig(context.TODO())
+	}
+
+	if err == nil {
 		// Create DynamoDB client
 		svc := dynamodb.NewFromConfig(cfg)
 

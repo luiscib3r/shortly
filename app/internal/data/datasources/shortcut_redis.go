@@ -2,7 +2,6 @@ package datasources
 
 import (
 	"context"
-	"log"
 	"os"
 
 	"github.com/luiscib3r/shortly/app/internal/domain/entities"
@@ -51,8 +50,6 @@ func (s ShortcutRedis) FindById(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	log.Printf("Find result: %v", result)
 
 	return result, nil
 }

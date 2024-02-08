@@ -1,0 +1,25 @@
+# Start from the amazon/dynamodb-local:latest image
+FROM amazon/dynamodb-local:latest
+
+USER root
+
+# Install necessary packages for AWS CLI
+RUN yum install -y python3-pip
+
+# Install AWS CLI
+RUN pip3 install awscli
+
+# Change user to dynamodb
+USER dynamodb
+
+COPY ./dynamodb-entrypoint.sh /entrypoint.sh
+
+# Set dummy AWS credentials
+ENV AWS_ACCESS_KEY_ID=dummy
+ENV AWS_SECRET_ACCESS_KEY=dummy
+
+# Expose DynamoDB local port
+EXPOSE 8000
+
+# Start DynamoDB Local
+ENTRYPOINT ["/entrypoint.sh"]

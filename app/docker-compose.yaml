@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+    dynamodb-local:
+        container_name: dynamodb-local
+        build:
+            context: .
+            dockerfile: Dockerfile.dynamodb
+        ports:
+            - "8000:8000"
+        user: root
+        volumes:
+            - "./docker/dynamodb:/home/dynamodblocal/data"
+        working_dir: /home/dynamodblocal
+        entrypoint: /entrypoint.sh
+
+    redis:
+        container_name: redis
+        image: "redis:latest"
+        ports:
+            - "6379:6379"
+
+    service:
+        container_name: service
+        build:
+            context: .
+            dockerfile: Dockerfile
+        depends_on:
+            - dynamodb-local
+            - redis
+        ports:
+            - "8080:8080"
+        environment:
+            BaseURL: "http://localhost:8080"
+            DynamoDBEndpoint: "http://dynamodb-local:8000"
+            RedisEndpoint: "redis:6379"
+            ShortcutsTableName: "Shortcuts"
