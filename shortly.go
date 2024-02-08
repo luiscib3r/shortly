@@ -7,9 +7,11 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsapplicationautoscaling"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecrassets"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecs"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecspatterns"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awselasticache"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awselasticloadbalancingv2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsroute53"
@@ -51,6 +53,87 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 			Type: awsdynamodb.AttributeType_STRING,
 		},
 	})
+
+	// Cluster VPC
+	vpcName := resourceName("vpc")
+	vpc := awsec2.NewVpc(stack, jsii.String(vpcName), &awsec2.VpcProps{
+		IpAddresses: awsec2.IpAddresses_Cidr(jsii.String("10.0.0.0/16")),
+		NatGateways: jsii.Number(1),
+		SubnetConfiguration: &[]*awsec2.SubnetConfiguration{
+			{
+				Name:       jsii.String("public"),
+				CidrMask:   jsii.Number(24),
+				SubnetType: awsec2.SubnetType_PUBLIC,
+			},
+			{
+				Name:       jsii.String("private"),
+				CidrMask:   jsii.Number(24),
+				SubnetType: awsec2.SubnetType_PRIVATE_WITH_EGRESS,
+			},
+		},
+	})
+
+	// Private Subnets
+	privateSubNets := vpc.PrivateSubnets()
+	var privateSubNetIds []string
+	for _, subnet := range *privateSubNets {
+		privateSubNetIds = append(privateSubNetIds, *subnet.SubnetId())
+	}
+
+	// Redis Subnet Group
+	redisSubNetGroup := awselasticache.NewCfnSubnetGroup(
+		stack,
+		jsii.String(resourceName("redis-subnet-group")),
+		&awselasticache.CfnSubnetGroupProps{
+			Description: jsii.String("Redis Subnet Group"),
+			SubnetIds:   jsii.Strings(privateSubNetIds...),
+		},
+	)
+
+	// Security Groups
+	// Fargate Security Group
+	fargateSecurityGroupName := resourceName("fargate-sg")
+	fargateSecurityGroup := awsec2.NewSecurityGroup(stack, jsii.String(fargateSecurityGroupName), &awsec2.SecurityGroupProps{
+		SecurityGroupName: jsii.String(fargateSecurityGroupName),
+		Vpc:               vpc,
+		AllowAllOutbound:  jsii.Bool(true),
+	})
+
+	fargateSecurityGroup.AddIngressRule(
+		awsec2.Peer_AnyIpv4(),
+		awsec2.Port_Tcp(jsii.Number(8080)),
+		jsii.String("Allow inbound traffic on port 8080"),
+		nil,
+	)
+
+	// Redis Security Group
+	redisSecurityGroupName := resourceName("redis-sg")
+	redisSecurityGroup := awsec2.NewSecurityGroup(stack, jsii.String(redisSecurityGroupName), &awsec2.SecurityGroupProps{
+		SecurityGroupName: jsii.String(redisSecurityGroupName),
+		Vpc:               vpc,
+		AllowAllOutbound:  jsii.Bool(true),
+	})
+
+	redisSecurityGroup.AddIngressRule(
+		fargateSecurityGroup,
+		awsec2.Port_Tcp(jsii.Number(6379)),
+		jsii.String("Allow inbound traffic on port 6379 from Fargate Service"),
+		nil,
+	)
+
+	// Database Redis
+	redisName := resourceName("redis")
+	redisCluster := awselasticache.NewCfnCacheCluster(
+		stack,
+		jsii.String(redisName),
+		&awselasticache.CfnCacheClusterProps{
+			Engine:               jsii.String("redis"),
+			CacheNodeType:        jsii.String("cache.t3.micro"),
+			NumCacheNodes:        jsii.Number(1),
+			CacheSubnetGroupName: redisSubNetGroup.Ref(),
+			VpcSecurityGroupIds:  &[]*string{redisSecurityGroup.SecurityGroupId()},
+		},
+	)
 
 	// ECS Task Role
 	taskRoleName := resourceName("task-role")
@@ -107,6 +190,7 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 			Environment: &map[string]*string{
 				"BaseURL":            jsii.String(os.Getenv("BaseURL")),
 				"ShortcutsTableName": shortcutTable.TableName(),
+				"RedisEndpoint":      redisCluster.AttrRedisEndpointAddress(),
 			},
 			HealthCheck: &awsecs.HealthCheck{
 				Command: jsii.Strings("CMD-SHELL", "curl -f http://localhost:8080/healthcheck || exit 1"),
@@ -122,6 +206,15 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 		},
 	)
 
+	// Cluster with VPC
+	clusterName := resourceName("cluster")
+	cluster := awsecs.NewCluster(stack, jsii.String(clusterName), &awsecs.ClusterProps{
+		ClusterName: jsii.String(clusterName),
+		Vpc:         vpc,
+	})
+
+	securityGroups := &[]awsec2.ISecurityGroup{fargateSecurityGroup}
+
 	// Fargate Load Balanced Service
 	serviceName := resourceName("service")
 	service := awsecspatterns.NewApplicationLoadBalancedFargateService(stack,
@@ -129,6 +222,8 @@ func NewShortlyStack(scope constructs.Construct, id string, props *ShortlyStackP
 		&awsecspatterns.ApplicationLoadBalancedFargateServiceProps{
 			ServiceName:        jsii.String(serviceName),
 			LoadBalancerName:   jsii.String(resourceName("lb")),
+			Cluster:            cluster,
+			SecurityGroups:     securityGroups,
 			TaskDefinition:     taskDef,
 			PublicLoadBalancer: jsii.Bool(true),
 			DesiredCount:       jsii.Number(1),

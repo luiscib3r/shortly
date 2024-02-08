@@ -9,7 +9,6 @@ import (
 	_ "github.com/luiscib3r/shortly/app/docs"
 	"github.com/luiscib3r/shortly/app/internal/data/datasources"
 	"github.com/luiscib3r/shortly/app/internal/data/repositories"
-	"github.com/luiscib3r/shortly/app/internal/domain/entities"
 	"github.com/luiscib3r/shortly/app/internal/presentation/handlers"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
@@ -33,18 +32,26 @@ func main() {
 	//----------------------------------------
 	// Datasources
 	//----------------------------------------
-	shortcutMemDB := datasources.NewMemDB[entities.Shortcut]()
 	environment := datasources.NewEnvironmentDataSource()
-	shortcutDynamoDB, err := datasources.NewShortcutDynamoDB()
 
-	if err != nil {
-		log.Fatal(err)
+	shortcutRedis, redisErr := datasources.NewShortcutRedis()
+
+	if redisErr != nil {
+		log.Println("Error creating redis client")
+		log.Fatal(redisErr)
+	}
+
+	shortcutDynamoDB, dbErr := datasources.NewShortcutDynamoDB()
+
+	if dbErr != nil {
+		log.Println("Error creating dynamodb client")
+		log.Fatal(dbErr)
 	}
 
 	//----------------------------------------
 	// Repositories
 	//----------------------------------------
-	shortcutRepository := repositories.NewShortcutRepositoryData(shortcutDynamoDB, shortcutMemDB)
+	shortcutRepository := repositories.NewShortcutRepositoryData(shortcutDynamoDB, shortcutRedis)
 	environmentRepository := repositories.NewEnvironmentRepositoryData(environment)
 
 	//----------------------------------------

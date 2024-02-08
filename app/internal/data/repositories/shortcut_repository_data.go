@@ -13,16 +13,16 @@ import (
 
 type ShortcutRepositoryData struct {
 	dynamodb *datasources.ShortcutDynamoDB
-	*CrudRepositoryData[entities.Shortcut]
+	redis *datasources.ShortcutRedis
 }
 
 func NewShortcutRepositoryData(
 	shortcutDynamoDB *datasources.ShortcutDynamoDB,
-	memdb *datasources.MemDB[entities.Shortcut],
+	shortcutRedis *datasources.ShortcutRedis,
 ) *ShortcutRepositoryData {
 	return &ShortcutRepositoryData{
 		dynamodb:           shortcutDynamoDB,
-		CrudRepositoryData: NewCrudRepositoryData[entities.Shortcut](memdb),
+		redis:              shortcutRedis,
 	}
 }
 
@@ -75,17 +75,17 @@ func (r ShortcutRepositoryData) FindById(id string) (entities.Shortcut, bool) {
 	var result entities.Shortcut
 
 	// Try to get from cache
-	cache, found := r.memdb.FindById(id)
+	urlCache, err := r.redis.FindById(id)
 
-	if found {
-		result = cache
+	if err == nil {
+		result = *entities.NewShortcut(id, urlCache)
 	} else {
 		// Try to get from dynamodb
 		entity, found := r.dynamodb.FindById(id)
 
 		if found {
 			// Cache it
-			r.memdb.Save(entity)
+			r.redis.Save(entity)
 			result = entity
 		} else {
 			return entities.Shortcut{}, false
@@ -99,7 +99,7 @@ func (r ShortcutRepositoryData) Save(entity entities.Shortcut) (entities.Shortcu
 	result, err := r.dynamodb.Save(entity)
 
 	if result {
-		r.memdb.Save(entity)
+		r.redis.Save(entity)
 		return entity, nil
 	} else {
 		return entities.Shortcut{}, err
